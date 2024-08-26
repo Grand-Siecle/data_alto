@@ -1,0 +1,44 @@
+name: Reduce XML Size
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '**/*.xml'
+
+jobs:
+  reduce-xml:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 2
+
+    - name: Install xmllint
+      run: sudo apt-get install -y libxml2-utils
+
+    - name: Get changed files
+      id: changed-files
+      run: |
+        echo "files=$(git diff --name-only HEAD^ HEAD | grep '\.xml$' | tr '\n' ' ')" >> $GITHUB_OUTPUT
+
+    - name: Reduce XML size
+      run: |
+        for file in ${{ steps.changed-files.outputs.files }}; do
+          xmllint --noblanks "$file" --output "${file}.min"
+          mv "${file}.min" "$file"
+        done
+
+    - name: Commit changes
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add -A
+        git diff --quiet && git diff --staged --quiet || git commit -m "Reduce XML file sizes"
+
+    - name: Push changes
+      uses: ad-m/github-push-action@master
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        branch: main
